@@ -5,7 +5,7 @@
 #SBATCH --ntasks=1                 # Nombre de processeurs/tâches
 #SBATCH --mem=64G                  # Mémoire RAM requise (ici 64 Go)
 #SBATCH --output=resultats.txt     # Le fichier où atterriront vos "print()"
-#SBATCH --gpus=1
+#SBATCH --gpus=2
 
 # Charger Python sur le cluster (la commande exacte peut varier sur Alan)
 module load python 

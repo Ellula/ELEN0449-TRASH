@@ -100,11 +100,19 @@ if __name__ == "__main__":
             predictor.handle_request(dict(
                 type="add_prompt", session_id=session_id, frame_index=0, text=prompt_text_str
             ))
-        elif last_bbox:
-            predictor.handle_request(dict(
-                type="add_prompt", session_id=session_id, frame_index=0, 
-                bounding_boxes=[last_bbox], clear_old_boxes=True
-            ))
+        else:
+            if last_bbox is not None:
+                print(f"Applying relay bounding box to Chunk {i+1}: {last_bbox}")
+                predictor.handle_request(dict(
+                    type="add_prompt", session_id=session_id, frame_index=0, 
+                    bounding_boxes=[last_bbox], clear_old_boxes=True
+                ))
+            else:
+                # CRITICAL FIX: Fallback if the object was lost in the previous chunk
+                print(f"Warning: Lost object at end of Chunk {i}. Falling back to text prompt.")
+                predictor.handle_request(dict(
+                    type="add_prompt", session_id=session_id, frame_index=0, text=prompt_text_str
+                ))
 
         # Propagate within this chunk
         chunk_outputs = {}
@@ -139,9 +147,12 @@ if __name__ == "__main__":
         )
         fig = plt.gcf()
         fig.canvas.draw()
-        img_array = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
-        img_array = img_array.reshape((fig.canvas.get_width_height()[::-1] + (3,)))
-        out_video.write(cv2.resize(cv2.cvtColor(img_array, cv2.COLOR_RGB2BGR), (w, h)))
+        
+        rgba = np.asarray(fig.canvas.buffer_rgba())
+        
+        img_bgr = cv2.cvtColor(rgba, cv2.COLOR_RGBA2BGR)
+        
+        out_video.write(cv2.resize(img_bgr, (w, h)))
         plt.close(fig)
 
     out_video.release()
