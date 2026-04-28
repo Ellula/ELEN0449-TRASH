@@ -3,7 +3,7 @@
 #SBATCH --job-name=job_sam3  # Le nom de votre tâche
 #SBATCH --time=01:00:00            # Temps maximum alloué (ici 1 heure)
 #SBATCH --ntasks=1                 # Nombre de processeurs/tâches
-#SBATCH --mem=4G                   # Mémoire RAM requise (ici 4 Go)
+#SBATCH --mem=64G                  # Mémoire RAM requise (ici 64 Go)
 #SBATCH --output=resultats.txt     # Le fichier où atterriront vos "print()"
 #SBATCH --gpus=1
 
