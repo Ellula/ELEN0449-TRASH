@@ -24,3 +24,5 @@ TestResults.xml
 data/*
 
 .DS_Store
+
+.env
