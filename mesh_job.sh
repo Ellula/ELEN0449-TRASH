@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=mesh_splatting
-#SBATCH --time=24:00:00            
+#SBATCH --time=30:00:00            
 #SBATCH --ntasks=1
 #SBATCH --mem=64G
 #SBATCH --gres=gpu:2
