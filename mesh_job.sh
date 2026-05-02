@@ -54,11 +54,16 @@ for PROJET_PATH in $DATA_DIR/project-*; do
         export PYTHONUNBUFFERED=1
 
 
-        # Si le dossier sparse est caché dans 'colmap', on le remonte à la racine
-        if [ -d "$PROJET_PATH/colmap/sparse" ]; then
-            echo "Réorganisation des dossiers COLMAP pour $NOM_SCENE..."
+        # --- RÉORGANISATION DES DOSSIERS COLMAP ---
+        if [ -d "$PROJET_PATH/colmap/sparse/0" ]; then
+            echo "Structure détectée : colmap/sparse/0. Extraction directe..."
+            # On sort le contenu de '0' pour le mettre dans un dossier 'sparse' à la racine
+            mkdir -p "$PROJET_PATH/sparse"
+            mv "$PROJET_PATH/colmap/sparse/0/"* "$PROJET_PATH/sparse/"
+            [ -f "$PROJET_PATH/colmap/database.db" ] && mv "$PROJET_PATH/colmap/database.db" "$PROJET_PATH/"
+        elif [ -d "$PROJET_PATH/colmap/sparse" ]; then
+            echo "Structure détectée : colmap/sparse. Remontée à la racine..."
             mv "$PROJET_PATH/colmap/sparse" "$PROJET_PATH/"
-            # On peut aussi remonter la database si elle est là
             [ -f "$PROJET_PATH/colmap/database.db" ] && mv "$PROJET_PATH/colmap/database.db" "$PROJET_PATH/"
         fi
 
