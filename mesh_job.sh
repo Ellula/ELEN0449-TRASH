@@ -1,63 +1,68 @@
 #!/bin/bash
-#SBATCH --job-name=mesh_batch
-#SBATCH --time=12:00:00
+#SBATCH --job-name=mesh_splatting_all
+#SBATCH --time=12:00:00            
 #SBATCH --ntasks=1
 #SBATCH --mem=64G
-#SBATCH --output=resultats/resultats_%j.txt
-#SBATCH --gpus=1
+#SBATCH --gres=gpu:2
+#SBATCH --output=resultats/resultats_%j.txt   # Fichier pour les textes normaux
+#SBATCH --error=resultats/logs_%j.txt    # NOUVEAU : Fichier réservé aux crashs/erreurs
+#SBATCH --nodelist=compute-03
 
-# 1. Environnement
-CONDA_PATH=$(which conda)
-source $(dirname $CONDA_PATH)/../etc/profile.d/conda.sh
-conda activate cvu-mesh
+# --- MODE DEBUG ACTIVÉ ---
+echo "DÉMARRAGE DU SCRIPT"
+echo "Je m'exécute dans ce dossier : $(pwd)"
+# -------------------------
 
-# Sécurité pour les vieux CPU
-export ATEN_CPU_CAPABILITY=default
-export MKL_DEBUG_CPU_TYPE=5
+# 1. Initialisation de Micromamba (On garde ta méthode qui est la bonne)
+eval "$(/home/mklinkenberg/.local/bin/micromamba shell hook --shell bash)"
+export MAMBA_ROOT_PREFIX=~/micromamba/
+micromamba activate mesh_splatting
 
-# 2. Chemins
-ROOT_DIR=$(pwd)
-SCRIPT_DIR="$ROOT_DIR/../mesh-splatting"
-DATA_DIR="$ROOT_DIR/data"
-OUTPUT_DIR="$ROOT_DIR/output"
+# Vérification : est-ce que Python est bien là ?
+echo "Version de Python trouvée :"
+which python
 
-# AJOUT CRUCIAL : On déclare les sous-modules pour Python
-export PYTHONPATH="$SCRIPT_DIR:$SCRIPT_DIR/submodules/diff-gaussian-rasterization:$SCRIPT_DIR/submodules/simple-knn:$PYTHONPATH"
+# 2. LES CHEMINS (⚠️ UTILISE DES CHEMINS ABSOLUS)
+# Remplace cette ligne par le VRAI chemin complet vers ton dossier de travail
+# Exemple : DATA_DIR="/home/mklinkenberg/mon_projet_splatting/data"
+DATA_DIR="$(pwd)/data" 
+OUTPUT_DIR="$(pwd)/output"
+
+echo "Je cherche les dossiers dans : $DATA_DIR"
+
+# Vérification : est-ce que le dossier data existe vraiment ?
+if [ ! -d "$DATA_DIR" ]; then
+    echo "ERREUR CRITIQUE : Le dossier $DATA_DIR n'existe pas ! Arrêt du script."
+    exit 1
+fi
 
 mkdir -p "$OUTPUT_DIR"
 
-# 3. Réinstallation de secours (à ne faire qu'une fois si ça crash encore)
-# Si tu veux tenter une recompilation propre sur le nœud :
-# cd "$SCRIPT_DIR/submodules/diff-gaussian-rasterization" && pip install -e .
-# cd "$SCRIPT_DIR/submodules/simple-knn" && pip install -e .
-# cd "$SCRIPT_DIR"
+# 3. La boucle
+for PROJET_PATH in $DATA_DIR/project-*; do
+    
+    echo "Fichier/Dossier détecté : $PROJET_PATH"
 
-# echo ">>> Réinstallation des modules sur le nœud de calcul..."
-# cd "$SCRIPT_DIR/submodules/diff-gaussian-rasterization" && pip install -q -e .
-# cd "$SCRIPT_DIR/submodules/simple-knn" && pip install -q -e .
-# cd "$SCRIPT_DIR"
-
-# 4. Boucle de traitement
-for PROJET_PATH in "$DATA_DIR"/project-*; do
     if [ -d "$PROJET_PATH" ]; then
-        NOM_PROJET=$(basename "$PROJET_PATH")
-        SCENE_OUTPUT="$OUTPUT_DIR/$NOM_PROJET"
-        mkdir -p "$SCENE_OUTPUT"
-
+        NOM_SCENE=$(basename "$PROJET_PATH")
+        
         echo "-------------------------------------------------------"
-        echo "TRAITEMENT RÉEL : $NOM_PROJET"
+        echo "DÉBUT DU TRAITEMENT : $NOM_SCENE"
         echo "-------------------------------------------------------"
 
-        cd "$SCRIPT_DIR"
+        # On force Python à écrire en direct (pas de buffering)
+        export PYTHONUNBUFFERED=1
 
-        # ÉTAPE A : Normales
-        python extract_normals.py -s "$PROJET_PATH"
+        # ÉTAPE A : Extraire les normales
+        python mesh-splatting/extract_normals.py -s "$PROJET_PATH"
 
-        # ÉTAPE B : Entraînement
-        # On enlève --quiet pour voir EXACTEMENT où ça crash si ça recommence
-        echo ">>> Lancement de l'entraînement..."
-        python train.py -s "$PROJET_PATH" -i images_4 -m "$SCENE_OUTPUT" --eval --test_iterations -1
+        # ÉTAPE B : Lancer l'entraînement
+        python mesh-splatting/train.py -s "$PROJET_PATH" -m "$OUTPUT_DIR/$NOM_SCENE" --indoor --eval
 
-        # ... (le reste du script : render et metrics)
+        echo "FIN DU TRAITEMENT : $NOM_SCENE"
+    else
+        echo "Ceci n'est pas un dossier, je l'ignore : $PROJET_PATH"
     fi
 done
+
+echo "FIN DU SCRIPT BASH"
