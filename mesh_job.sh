@@ -8,51 +8,47 @@
 #SBATCH --error=resultats/logs_%j.txt
 #SBATCH --nodelist=compute-03
 
-# --- MODE DEBUG ACTIVÉ ---
-echo "DÉMARRAGE DU SCRIPT"
-echo "Je m'exécute dans ce dossier : $(pwd)"
-# -------------------------
+# --- DEBUGGING---
+echo "Start of the script"
+echo "We are here: $(pwd)"
 
-# 1. Initialisation de Micromamba
+# Activation of the environnement
 eval "$(/home/mklinkenberg/.local/bin/micromamba shell hook --shell bash)"
 export MAMBA_ROOT_PREFIX=~/micromamba/
 micromamba activate mesh_splatting
 
-echo "Version de Python trouvée :"
+echo "Python version:"
 which python
 
-# 2. LES CHEMINS
+# Paths
 DATA_DIR="$(pwd)/data" 
 OUTPUT_DIR="$(pwd)/output"
 
-echo "Je cherche les dossiers dans : $DATA_DIR"
+echo "Searching for the folders in : $DATA_DIR"
 
 if [ ! -d "$DATA_DIR" ]; then
-    echo "ERREUR CRITIQUE : Le dossier $DATA_DIR n'existe pas ! Arrêt du script."
+    echo "ERROR: The folder $DATA_DIR doesn't exist! Stop."
     exit 1
 fi
 
 mkdir -p "$OUTPUT_DIR"
 
-# 3. La boucle
+# Loop
 for PROJET_PATH in $DATA_DIR/project-*; do
     
-    echo "Fichier/Dossier détecté : $PROJET_PATH"
+    echo "Detected folder: $PROJET_PATH"
 
     if [ -d "$PROJET_PATH" ]; then
         NOM_SCENE=$(basename "$PROJET_PATH")
         
         echo "-------------------------------------------------------"
-        echo "DÉBUT DU TRAITEMENT : $NOM_SCENE"
+        echo "START OF: $NOM_SCENE"
         echo "-------------------------------------------------------"
 
         export PYTHONUNBUFFERED=1
 
-        # =========================================================
-        # 1. AUTO-RÉORGANISATION UNIVERSELLE
-        # =========================================================
         if [ -d "$PROJET_PATH/colmap/sparse" ]; then
-            echo "-> Dossier colmap/sparse détecté. Déplacement à la racine..."
+            echo "-> Folder colmap/sparse detected. Move it to the root."
             mv -n "$PROJET_PATH/colmap/sparse" "$PROJET_PATH/" 2>/dev/null
             [ -f "$PROJET_PATH/colmap/database.db" ] && mv -n "$PROJET_PATH/colmap/database.db" "$PROJET_PATH/" 2>/dev/null
         fi
@@ -63,11 +59,8 @@ for PROJET_PATH in $DATA_DIR/project-*; do
             mv "$PROJET_PATH/sparse/"*.txt "$PROJET_PATH/sparse/0/" 2>/dev/null
         fi
 
-        # =========================================================
-        # 2. UNDISTORT : CONVERSION EN MODÈLE PINHOLE
-        # =========================================================
         if [ ! -d "$PROJET_PATH/distorted" ]; then
-            echo "-> Caméras non conformes : Lancement du redressement (Undistort) avec COLMAP..."
+            echo "-> Non-compliant cameras: Launching undistort process with Colmap"
             mkdir -p "$PROJET_PATH/distorted"
             
             mv "$PROJET_PATH/images" "$PROJET_PATH/distorted/"
@@ -79,35 +72,30 @@ for PROJET_PATH in $DATA_DIR/project-*; do
                 --output_path "$PROJET_PATH" \
                 --output_type COLMAP
             
-            echo "-> Redressement terminé !"
+            echo "-> Undistorting completed!"
         else
-            echo "-> Le redressement a déjà été fait précédemment (dossier 'distorted' trouvé)."
+            echo "-> Undistorting already performed (found 'distorted' folder)."
         fi
 
-        # =========================================================
-        # 3. RANGEMENT POST-COLMAP (Obligatoire pour Python)
-        # =========================================================
-        # L'undistorter a la fâcheuse manie de recracher les fichiers directement dans sparse/
         if [ -f "$PROJET_PATH/sparse/cameras.bin" ] || [ -f "$PROJET_PATH/sparse/cameras.txt" ]; then
-            echo "-> Rangement des fichiers sortis de COLMAP dans le dossier /0..."
+            echo "-> Moving COLMAP output files into the /0 directory..."
             mkdir -p "$PROJET_PATH/sparse/0"
             mv "$PROJET_PATH/sparse/"*.bin "$PROJET_PATH/sparse/0/" 2>/dev/null
             mv "$PROJET_PATH/sparse/"*.txt "$PROJET_PATH/sparse/0/" 2>/dev/null
         fi
 
-        # =========================================================
-        # ÉTAPE A : Extraire les normales
-        echo "-> Lancement de l'extraction des normales..."
+        # Start of extract normals
+        echo "Start of extract normals"
         python mesh-splatting/extract_normals.py -s "$PROJET_PATH"
 
-        # ÉTAPE B : Lancer l'entraînement
-        echo "-> Lancement de l'entraînement 3D..."
+        # Start of training
+        echo "Start of training"
         python mesh-splatting/train.py -s "$PROJET_PATH" -m "$OUTPUT_DIR/$NOM_SCENE" --indoor --eval
 
-        echo "FIN DU TRAITEMENT : $NOM_SCENE"
+        echo "END OF: $NOM_SCENE"
     else
-        echo "Ceci n'est pas un dossier, je l'ignore : $PROJET_PATH"
+        echo "This is not a folder, ignore it: $PROJET_PATH"
     fi
 done
 
-echo "FIN DU SCRIPT BASH"
+echo "END OF THE BASH SCRIPT"
