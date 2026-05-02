@@ -53,6 +53,15 @@ for PROJET_PATH in $DATA_DIR/project-*; do
         # On force Python à écrire en direct (pas de buffering)
         export PYTHONUNBUFFERED=1
 
+
+        # Si le dossier sparse est caché dans 'colmap', on le remonte à la racine
+        if [ -d "$PROJET_PATH/colmap/sparse" ]; then
+            echo "Réorganisation des dossiers COLMAP pour $NOM_SCENE..."
+            mv "$PROJET_PATH/colmap/sparse" "$PROJET_PATH/"
+            # On peut aussi remonter la database si elle est là
+            [ -f "$PROJET_PATH/colmap/database.db" ] && mv "$PROJET_PATH/colmap/database.db" "$PROJET_PATH/"
+        fi
+
         # ÉTAPE A : Extraire les normales
         python mesh-splatting/extract_normals.py -s "$PROJET_PATH"
 
