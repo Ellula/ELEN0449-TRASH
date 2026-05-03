@@ -2,6 +2,7 @@
 #SBATCH --job-name=mesh_splatting_array
 #SBATCH --time=10:00:00
 #SBATCH --ntasks=1
+#SBATCH --nnodes=1
 #SBATCH --mem=64G
 #SBATCH --gres=gpu:2
 #SBATCH --array=0-18%5 # Launches 19 jobs (from 0 to 18), with a maximum of 5 concurrently
