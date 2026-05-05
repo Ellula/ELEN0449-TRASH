@@ -35,13 +35,7 @@ if [ -z "$PROJET_PATH" ] || [ ! -d "$PROJET_PATH" ]; then
 fi
 
 NOM_SCENE=$(basename "$PROJET_PATH")
-if [ "$NOM_SCENE" == "project-S1_V1" ]; then
-    echo "-------------------------------------------------------"
-    echo "CLONE $SLURM_ARRAY_TASK_ID : $NOM_SCENE est déjà fait. On passe !"
-    echo "-------------------------------------------------------"
-    exit 0
-fi
-# ---
+
 echo "-------------------------------------------------------"
 echo "CLONE $SLURM_ARRAY_TASK_ID : START OF PROCESSING FOR $NOM_SCENE"
 echo "-------------------------------------------------------"
