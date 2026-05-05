@@ -1,14 +1,13 @@
 #!/bin/bash
 #SBATCH --job-name=mesh_splatting_array
-#SBATCH --time=10:00:00
+#SBATCH --time=2-00:00:00
 #SBATCH --ntasks=1
-#SBATCH --nnodes=1
 #SBATCH --mem=64G
-#SBATCH --gres=gpu:2
+#SBATCH --gres=gpu:1
 #SBATCH --array=0-18%5 # Launches 19 jobs (from 0 to 18), with a maximum of 5 concurrently
 #SBATCH --output=resultats/resultats_%A_%a.txt # %A = Global job ID, %a = Task ID
 #SBATCH --error=resultats/logs_%A_%a.txt
-#SBATCH --nodelist=compute-03,compute-08
+#SBATCH --nodelist=compute-07
 
 # Debugging
 echo "Start of the script - Task ID: $SLURM_ARRAY_TASK_ID"
@@ -36,6 +35,13 @@ if [ -z "$PROJET_PATH" ] || [ ! -d "$PROJET_PATH" ]; then
 fi
 
 NOM_SCENE=$(basename "$PROJET_PATH")
+if [ "$NOM_SCENE" == "project-S1_V1" ]; then
+    echo "-------------------------------------------------------"
+    echo "CLONE $SLURM_ARRAY_TASK_ID : $NOM_SCENE est déjà fait. On passe !"
+    echo "-------------------------------------------------------"
+    exit 0
+fi
+# ---
 echo "-------------------------------------------------------"
 echo "CLONE $SLURM_ARRAY_TASK_ID : START OF PROCESSING FOR $NOM_SCENE"
 echo "-------------------------------------------------------"
@@ -78,11 +84,28 @@ if [ -f "$PROJET_PATH/sparse/cameras.bin" ] || [ -f "$PROJET_PATH/sparse/cameras
     mv "$PROJET_PATH/sparse/"*.txt "$PROJET_PATH/sparse/0/" 2>/dev/null
 fi
 
+for IMG_DIR in "$PROJET_PATH"/images*; do
+    if [ -d "$IMG_DIR" ]; then
+        echo "Creating symbolic links for PNG files in $(basename "$IMG_DIR") to bypass JPG requirement..."
+        cd "$IMG_DIR"
+        for img in *.png; do
+            [ -e "$img" ] || continue
+            ln -sf "$img" "${img%.png}.jpg"
+        done
+        cd "$SLURM_SUBMIT_DIR" 
+    fi
+done
+
+rm -rf "$OUTPUT_DIR/$NOM_SCENE"
+
+rm -rf "$PROJET_PATH/normals"*
+
 # Training
 echo "Start of extract normals"
 python mesh-splatting/extract_normals.py -s "$PROJET_PATH"
 
 echo "Start of training"
-python mesh-splatting/train.py -s "$PROJET_PATH" -m "$OUTPUT_DIR/$NOM_SCENE" --indoor --eval
+mkdir -p "$OUTPUT_DIR/$NOM_SCENE"
+python mesh-splatting/train.py -s "$PROJET_PATH" -m "$OUTPUT_DIR/$NOM_SCENE" --indoor --eval -r 2
 
 echo "CLONE $SLURM_ARRAY_TASK_ID : END OF PROCESSING"
