@@ -24,10 +24,10 @@ OUTPUT_DIR="$(pwd)/output"
 mkdir -p "$OUTPUT_DIR"
 
 # Create a list of all "project-*" folders
-DOSSIERS=("$DATA_DIR"/project-*)
+FOLDERS=("$DATA_DIR"/project-*)
 
 # Select the folder corresponding to this clone's number
-PROJET_PATH="${DOSSIERS[$SLURM_ARRAY_TASK_ID]}"
+PROJET_PATH="${FOLDERS[$SLURM_ARRAY_TASK_ID]}"
 
 # Safety check in case the ID exceeds the number of folders
 if [ -z "$PROJET_PATH" ] || [ ! -d "$PROJET_PATH" ]; then
@@ -37,16 +37,14 @@ fi
 
 NOM_SCENE=$(basename "$PROJET_PATH")
 
-echo "-------------------------------------------------------"
 echo "CLONE $SLURM_ARRAY_TASK_ID : START OF PROCESSING FOR $NOM_SCENE"
-echo "-------------------------------------------------------"
 
 export PYTHONUNBUFFERED=1
 
 ITERATION_DIR="$OUTPUT_DIR/$NOM_SCENE/point_cloud/iteration_30000"
 
 if [ ! -d "$ITERATION_DIR" ]; then
-    echo "Erreur: Dossier iteration_30000 non trouvé pour $NOM_SCENE"
+    echo "Error: iteration_30000 not found for $NOM_SCENE"
     exit 1
 fi
 

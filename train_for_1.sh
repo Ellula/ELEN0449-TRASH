@@ -21,8 +21,6 @@ DATA_DIR="$(pwd)/data"
 OUTPUT_DIR="$(pwd)/output"
 mkdir -p "$OUTPUT_DIR"
 
-# Définir explicitement le dossier du projet
-# /!\ Modifie "project-S8_V2" par "S8_V2" si ton dossier n'a pas le préfixe "project-"
 PROJET_PATH="$DATA_DIR/project-S8_V2"
 
 # Safety check
@@ -33,9 +31,7 @@ fi
 
 NOM_SCENE=$(basename "$PROJET_PATH")
 
-echo "-------------------------------------------------------"
 echo "START OF PROCESSING FOR $NOM_SCENE"
-echo "-------------------------------------------------------"
 
 export PYTHONUNBUFFERED=1
 

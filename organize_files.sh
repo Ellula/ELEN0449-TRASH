@@ -4,39 +4,36 @@
 #SBATCH --ntasks=1
 #SBATCH --mem=64G
 #SBATCH --gres=gpu:1
-#SBATCH --output=resultats/resultats_%j.txt # %j = Job ID classique
+#SBATCH --output=resultats/resultats_%j.txt
 #SBATCH --error=resultats/logs_%j.txt
 
 # Script 5
 
-# On crée le dossier global 'output' s'il n'existe pas
+# Organize the JSON files into the project folders 
+
 mkdir -p output
 
-# On parcourt les fichiers JSON qu'on vient d'importer depuis le Mac
-for file in ~/cvu/images_a_annoter/*.sam_prompts.json; do
+# We go through the JSON files that we just imported from the computer
+for file in ~/cvu/images_to_annote/*.sam_prompts.json; do
     
-    # Sécurité au cas où le dossier serait vide
     [ -e "$file" ] || continue
 
-    # On isole le nom complet du fichier
+    # We isolate the file name
     filename=$(basename "$file")
 
-    # On extrait le nom du projet (tout ce qui est avant "_frame_")
-    # -> Donne : project-S2_V1
+    # We isolate the folder name
     project_name="${filename%_frame_*}"
 
-    # On extrait le nom de la frame (tout ce qui est après le nom du projet + "_")
-    # -> Donne : frame_00015.sam_prompts.json
+    # We isolate the frame name
     frame_name="${filename#${project_name}_}"
 
-    # On crée le bon sous-dossier de destination (ex: output/project-S2_V1)
+    # Create the folder if needed
     mkdir -p "output/${project_name}"
 
-    # On déplace le fichier au bon endroit et on le renomme proprement
+    # Move the file to the right folder and rename it
     mv "$file" "output/${project_name}/$frame_name"
 
-    echo "✅ Rangé : $frame_name dans output/${project_name}/"
+    echo " $frame_name is in output/${project_name}/"
 done
 
-echo "------------------------------------------------"
-echo "🎉 Terminé ! Tous tes fichiers sont triés dans le dossier output/."
+echo "All the files are organized in the output folder."

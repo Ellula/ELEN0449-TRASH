@@ -38,9 +38,7 @@ fi
 
 NOM_SCENE=$(basename "$PROJET_PATH")
 
-echo "-------------------------------------------------------"
 echo "CLONE $SLURM_ARRAY_TASK_ID : START OF PROCESSING FOR $NOM_SCENE"
-echo "-------------------------------------------------------"
 
 export PYTHONUNBUFFERED=1
 

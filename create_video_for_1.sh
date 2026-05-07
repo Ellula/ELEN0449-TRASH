@@ -4,7 +4,7 @@
 #SBATCH --ntasks=1
 #SBATCH --mem=64G
 #SBATCH --gres=gpu:1
-#SBATCH --output=resultats/resultats_%j.txt # %j = Job ID classique
+#SBATCH --output=resultats/resultats_%j.txt
 #SBATCH --error=resultats/logs_%j.txt
 
 # Script 3.5
@@ -35,10 +35,7 @@ fi
 
 NOM_SCENE=$(basename "$PROJET_PATH")
 
-echo "-------------------------------------------------------"
 echo "START OF PROCESSING FOR $NOM_SCENE"
-echo "-------------------------------------------------------"
-
 
 python mesh-splatting/create_video.py -m "$OUTPUT_DIR/$NOM_SCENE" -s "$PROJET_PATH" -r 2
 

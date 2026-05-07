@@ -4,15 +4,17 @@
 #SBATCH --ntasks=1
 #SBATCH --mem=64G
 #SBATCH --gres=gpu:1
-#SBATCH --output=resultats/resultats_%j.txt # %j = Job ID classique
+#SBATCH --output=resultats/resultats_%j.txt
 #SBATCH --error=resultats/logs_%j.txt
 #SBATCH --mail-user=mae.klinkenberg@student.uliege.be
 #SBATCH --mail-type=END,FAIL 
 
 # Script 4
 
-# On crée un dossier temporaire pour mettre les images
-mkdir -p images_a_annoter
+# Take only the images to annote it and zip it to transfer to my computer 
+# because Alan doesn't support graphical user interfaces
+
+mkdir -p images_to_annote
 
 projects=()
 for s in {1..8}; do
@@ -20,6 +22,7 @@ for s in {1..8}; do
 done
 projects+=("project-S9_V1" "project-S2_V3")
 
+# We take a frame with all the wastes and at least one object of reference
 for proj in "${projects[@]}"; do
     frame_number="00001"
     case "$proj" in
@@ -36,11 +39,11 @@ for proj in "${projects[@]}"; do
     img_path="data/${proj}/images/frame_${frame_number}.png"
 
     if [ -f "$img_path" ]; then
-        # On copie l'image en lui donnant le nom du projet pour ne pas les mélanger
-        cp "$img_path" "images_a_annoter/${proj}_frame_${frame_number}.png"
+        # Copy the image and rename it to avoid confusion
+        cp "$img_path" "images_to_annote/${proj}_frame_${frame_number}.png"
     fi
 done
 
-# On compresse le dossier
-zip -r images_a_annoter.zip images_a_annoter/
-echo "✅ C'est prêt ! Le fichier images_a_annoter.zip contient uniquement tes 18 images."
+# Zip the folder
+zip -r images_to_annote.zip images_to_annote/
+echo "The file images_to_annote.zip contains the 18 frames."

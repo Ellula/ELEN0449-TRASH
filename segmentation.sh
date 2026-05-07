@@ -1,10 +1,10 @@
 #!/bin/bash
 #SBATCH --job-name=mesh_segmentation_array
-#SBATCH --time=0-04:00:00 # 4h est largement suffisant pour UNE scène
+#SBATCH --time=0-04:00:00
 #SBATCH --ntasks=1
 #SBATCH --mem=64G
 #SBATCH --gres=gpu:1
-#SBATCH --array=0-18%5 # Vos 19 dossiers, max 5 en parallèle
+#SBATCH --array=0-17%5
 #SBATCH --output=resultats/resultats_seg_%A_%a.txt
 #SBATCH --error=resultats/logs_seg_%A_%a.txt
 #SBATCH --nodelist=compute-01
@@ -28,23 +28,23 @@ export PYTHONUNBUFFERED=1
 
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
-# TRÈS IMPORTANT : Déplacement dans le dossier du code
+# We move into mesh-splatting
 cd mesh-splatting
-CHEMIN_DU_MODELE_PT="/home/mklinkenberg/cvu/sam2/sam2.1_hiera_large.pt"
+PT_MODEL_PATH="/home/mklinkenberg/cvu/sam2/sam2.1_hiera_large.pt"
 
-# Crée un lien symbolique dans le dossier courant pour que Python le trouve
-if [ -f "$CHEMIN_DU_MODELE_PT" ]; then
-    ln -sf "$CHEMIN_DU_MODELE_PT" .
+# We create a link because we are in mesh-splatting and not in sam2
+if [ -f "$PT_MODEL_PATH" ]; then
+    ln -sf "$PT_MODEL_PATH" .
 else
-    echo "ERREUR CRITIQUE : Le fichier $CHEMIN_DU_MODELE_PT est introuvable."
+    echo "Error : The file $PT_MODEL_PATH doesn't exist."
     exit 1
 fi
 
-# Sélection du dossier via le Slurm Array
+# We select the right project folder
 DOSSIERS=("$DATA_DIR"/project-*)
 PROJET_PATH="${DOSSIERS[$SLURM_ARRAY_TASK_ID]}"
 
-# Sécurité
+# Security
 if [ -z "$PROJET_PATH" ] || [ ! -d "$PROJET_PATH" ]; then
     echo "End: No folder found for task n°$SLURM_ARRAY_TASK_ID"
     exit 0
@@ -53,40 +53,38 @@ fi
 NOM_SCENE=$(basename "$PROJET_PATH")
 MODEL_PATH="$OUTPUT_DIR/$NOM_SCENE"
 
-echo "-------------------------------------------------------"
 echo "CLONE $SLURM_ARRAY_TASK_ID : START OF PROCESSING FOR $NOM_SCENE"
-echo "-------------------------------------------------------"
 
-# 1. Vérifier la présence du JSON
+# Verify if there is a JSON
 JSON_FILE=$(ls "$MODEL_PATH"/*.sam_prompts.json 2>/dev/null | head -n 1)
 
 if [ -z "$JSON_FILE" ]; then
-    echo "⏭Pas de fichier JSON trouvé pour $NOM_SCENE. Le job s'arrête ici."
+    echo "JSON file not found for $NOM_SCENE. Stop."
     exit 0
 fi
 
-echo "======================================================="
-echo "Fichier JSON détecté : $(basename "$JSON_FILE")"
-echo "======================================================="
+echo "JSON file found: $(basename "$JSON_FILE")"
 
 MASKS_DIR="$MODEL_PATH/masks"
 
-echo " Nettoyage des potentiels fichiers corrompus des anciens runs..."
+echo " Cleaning of the previous attempts"
 rm -rf "$MASKS_DIR"
 rm -f "$MODEL_PATH"/*.ply
-rm -f mesh.ply object.ply
+rm -f mesh.ply
 
 mkdir -p "$MASKS_DIR"
 IMAGES_DIR="$PROJET_PATH/images" 
 
-# --- ÉTAPES GLOBALES (1 FOIS PAR SCÈNE) ---
-echo " Extraction des images..."
+echo " Extraction of the images"
 python -m segmentation.extract_images -s "$PROJET_PATH" -m "$MODEL_PATH" --eval
 
-echo " Génération des masques avec SAM..."
-python -m segmentation.sam_mask_generator_json --data_path "$IMAGES_DIR" --save_path "$MASKS_DIR" --json_path "$JSON_FILE"
+echo " Generate masks with SAM"
+DOSSIER_TMP="tmp_sam_${SLURM_ARRAY_TASK_ID}"
+rm -rf "$DOSSIER_TMP"
+mkdir -p "$DOSSIER_TMP"
+python -m segmentation.sam_mask_generator_json --data_path "$IMAGES_DIR" --save_path "$MASKS_DIR" --json_path "$JSON_FILE" --tmp_dir "$DOSSIER_TMP"
 
-# --- EXTRACTION DES IDs DEPUIS LE JSON ---
+# We extract the IDs from the JSON
 OBJECT_IDS=$(python -c "
 import json, sys
 try:
@@ -99,35 +97,29 @@ except Exception:
     print('1')
 " "$JSON_FILE")
 
-echo " Objets à traiter pour cette scène : $OBJECT_IDS"
+echo " Objects to process: $OBJECT_IDS"
 
-# --- SOUS-BOUCLE POUR CHAQUE OBJET ---
+# For each object
 for OBJECT_ID in $OBJECT_IDS; do
-    echo "---------------------------------------------------"
-    echo "   -> Traitement de l'objet ID : $OBJECT_ID"
+    echo "   Processing object : $OBJECT_ID"
 
-    echo "   3 Identification des triangles..."
+    echo "  Identification of triangles"
     python -m segmentation.segment -s "$PROJET_PATH" -m "$MODEL_PATH" --eval --path_mask "$MASKS_DIR" --object_id "$OBJECT_ID"
     
-    echo "   4 Filtrage et rendu..."
+    echo "   Filtering and rendering"
     python -m segmentation.run_single_object -s "$PROJET_PATH" -m "$MODEL_PATH" --eval --ratio_threshold 0.90
     
-    echo "   5 Création du fichier PLY..."
-    python -m segmentation.create_ply "$MODEL_PATH"
+    echo "   Creation PLY file"
+    python -m segmentation.create_ply "$MODEL_PATH" --out "$MODEL_PATH/mesh.ply"
 
-    # Sécurisation du fichier généré
-    # On vérifie d'abord dans le dossier courant (cas le plus probable)
-    if [ -f "mesh.ply" ]; then
-        mv "mesh.ply" "$MODEL_PATH/${NOM_SCENE}_object_${OBJECT_ID}.ply"
-        echo "     Objet sauvegardé : ${NOM_SCENE}_objet_${OBJECT_ID}.ply"
-    # Au cas où le script Python l'aurait bien mis dans MODEL_PATH
-    elif [ -f "$MODEL_PATH/mesh.ply" ]; then
+    if [ -f "$MODEL_PATH/mesh.ply" ]; then
         mv "$MODEL_PATH/mesh.ply" "$MODEL_PATH/${NOM_SCENE}_object_${OBJECT_ID}.ply"
-        echo "     Objet sauvegardé : ${NOM_SCENE}_objet_${OBJECT_ID}.ply"
+        echo "     Save object : ${NOM_SCENE}_object_${OBJECT_ID}.ply"
     else
-        echo "    Attention: Le fichier PLY généré n'a pas été trouvé. Ni dans le dossier courant, ni dans $MODEL_PATH."
+        echo "    Error: The PLY file was not generated in $MODEL_PATH."
+        exit 1
     fi
 
 done
 
-echo " TERMINÉ POUR $NOM_SCENE"
+echo "END OF $NOM_SCENE"
