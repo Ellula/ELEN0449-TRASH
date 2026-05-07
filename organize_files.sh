@@ -7,6 +7,8 @@
 #SBATCH --output=resultats/resultats_%j.txt # %j = Job ID classique
 #SBATCH --error=resultats/logs_%j.txt
 
+# Script 5
+
 # On crée le dossier global 'output' s'il n'existe pas
 mkdir -p output
 

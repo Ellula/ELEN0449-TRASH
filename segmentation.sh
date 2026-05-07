@@ -11,7 +11,7 @@
 #SBATCH --mail-user=mae.klinkenberg@student.uliege.be
 #SBATCH --mail-type=END,FAIL
 
-# Script 4
+# Script 6
 
 set -e
 

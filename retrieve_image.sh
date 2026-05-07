@@ -9,6 +9,8 @@
 #SBATCH --mail-user=mae.klinkenberg@student.uliege.be
 #SBATCH --mail-type=END,FAIL 
 
+# Script 4
+
 # On crée un dossier temporaire pour mettre les images
 mkdir -p images_a_annoter
 
