@@ -2,12 +2,12 @@
 #SBATCH --job-name=mesh_segmentation_array
 #SBATCH --time=0-04:00:00
 #SBATCH --ntasks=1
-#SBATCH --mem=64G
+#SBATCH --mem=364
 #SBATCH --gres=gpu:1
 #SBATCH --array=0-17%5
 #SBATCH --output=resultats/resultats_seg_%A_%a.txt
 #SBATCH --error=resultats/logs_seg_%A_%a.txt
-#SBATCH --nodelist=compute-01
+#SBATCH --nodelist=compute-11
 #SBATCH --mail-user=mae.klinkenberg@student.uliege.be
 #SBATCH --mail-type=END,FAIL
 
@@ -57,6 +57,15 @@ else
     PT_MODEL_PATH="$PT_BASE_MODEL_PATH"
 
 fi
+
+case "$PROJECT_PATH" in
+    "$DATA_DIR"/project-S[6-9]_*)
+        MANY_WASTES=TRUE
+        ;;
+    *)
+        MANY_WASTES=FALSE
+        ;;
+esac
 
 # We create a link because we are in mesh-splatting and not in sam2
 if [ -f "$PT_MODEL_PATH" ]; then
@@ -129,6 +138,8 @@ for OBJECT_ID in $OBJECT_IDS; do
     echo "   Filtering and rendering"
     if [ "$COUNT" -eq "$TOTAL_IDS" ]; then
         python -m segmentation.run_single_object -s "$PROJECT_PATH" -m "$MODEL_PATH" --eval --ratio_threshold 0.60
+    elif [ "$MANY_WASTES" == "TRUE" ]; then
+        python -m segmentation.run_single_object -s "$PROJECT_PATH" -m "$MODEL_PATH" --eval --ratio_threshold 0.70 --min_hits 5
     else
         python -m segmentation.run_single_object -s "$PROJECT_PATH" -m "$MODEL_PATH" --eval --ratio_threshold 0.90
     fi
