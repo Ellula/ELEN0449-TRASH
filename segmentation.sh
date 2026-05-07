@@ -30,7 +30,33 @@ export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
 # We move into mesh-splatting
 cd mesh-splatting
-PT_MODEL_PATH="/home/mklinkenberg/cvu/sam2/sam2.1_hiera_large.pt"
+PT_LARGE_MODEL_PATH="/home/mklinkenberg/cvu/sam2/sam2.1_hiera_large.pt"
+PT_BASE_MODEL_PATH="/home/mklinkenberg/cvu/sam2/sam2.1_hiera_base_plus.pt"
+
+# We select the right project folder
+shopt -s nullglob
+FOLDERS=(
+    "$DATA_DIR"/project-S[1-2]_*
+    "$DATA_DIR/project-S3_V1"
+    "$DATA_DIR"/project-S[4-5]_*
+)
+shopt -u nullglob
+PROJECT_PATH="${FOLDERS[$SLURM_ARRAY_TASK_ID]}"
+
+# Security
+if [ -z "$PROJECT_PATH" ] || [ ! -d "$PROJECT_PATH" ]; then
+    echo "End: No folder found for task n°$SLURM_ARRAY_TASK_ID"
+    exit 0
+fi
+
+if [[ "$PROJECT_PATH" == "$DATA_DIR"/project-S[1-2]_* ]] || \
+    [[ "$PROJECT_PATH" == "$DATA_DIR"/project-S3_V1 ]] || \
+    [[ "$PROJECT_PATH" == "$DATA_DIR"/project-S[4-5]_* ]]; then
+        PT_MODEL_PATH="$PT_LARGE_MODEL_PATH"
+else
+    PT_MODEL_PATH="$PT_BASE_MODEL_PATH"
+
+fi
 
 # We create a link because we are in mesh-splatting and not in sam2
 if [ -f "$PT_MODEL_PATH" ]; then
@@ -40,26 +66,16 @@ else
     exit 1
 fi
 
-# We select the right project folder
-DOSSIERS=("$DATA_DIR"/project-*)
-PROJET_PATH="${DOSSIERS[$SLURM_ARRAY_TASK_ID]}"
+NAME_SCENE=$(basename "$PROJECT_PATH")
+MODEL_PATH="$OUTPUT_DIR/$NAME_SCENE"
 
-# Security
-if [ -z "$PROJET_PATH" ] || [ ! -d "$PROJET_PATH" ]; then
-    echo "End: No folder found for task n°$SLURM_ARRAY_TASK_ID"
-    exit 0
-fi
-
-NOM_SCENE=$(basename "$PROJET_PATH")
-MODEL_PATH="$OUTPUT_DIR/$NOM_SCENE"
-
-echo "CLONE $SLURM_ARRAY_TASK_ID : START OF PROCESSING FOR $NOM_SCENE"
+echo "CLONE $SLURM_ARRAY_TASK_ID : START OF PROCESSING FOR $NAME_SCENE"
 
 # Verify if there is a JSON
 JSON_FILE=$(ls "$MODEL_PATH"/*.sam_prompts.json 2>/dev/null | head -n 1)
 
 if [ -z "$JSON_FILE" ]; then
-    echo "JSON file not found for $NOM_SCENE. Stop."
+    echo "JSON file not found for $NAME_SCENE. Stop."
     exit 0
 fi
 
@@ -73,16 +89,16 @@ rm -f "$MODEL_PATH"/*.ply
 rm -f mesh.ply
 
 mkdir -p "$MASKS_DIR"
-IMAGES_DIR="$PROJET_PATH/images" 
+IMAGES_DIR="$PROJECT_PATH/images" 
 
 echo " Extraction of the images"
-python -m segmentation.extract_images -s "$PROJET_PATH" -m "$MODEL_PATH" --eval
+python -m segmentation.extract_images -s "$PROJECT_PATH" -m "$MODEL_PATH" --eval
 
 echo " Generate masks with SAM"
-DOSSIER_TMP="tmp_sam_${SLURM_ARRAY_TASK_ID}"
-rm -rf "$DOSSIER_TMP"
-mkdir -p "$DOSSIER_TMP"
-python -m segmentation.sam_mask_generator_json --data_path "$IMAGES_DIR" --save_path "$MASKS_DIR" --json_path "$JSON_FILE" --tmp_dir "$DOSSIER_TMP"
+TMP_DIR="tmp_sam_${SLURM_ARRAY_TASK_ID}"
+rm -rf "$TMP_DIR"
+mkdir -p "$TMP_DIR"
+python -m segmentation.sam_mask_generator_json --data_path "$IMAGES_DIR" --save_path "$MASKS_DIR" --json_path "$JSON_FILE" --tmp_dir "$TMP_DIR"
 
 # We extract the IDs from the JSON
 OBJECT_IDS=$(python -c "
@@ -99,22 +115,30 @@ except Exception:
 
 echo " Objects to process: $OBJECT_IDS"
 
+TOTAL_IDS=$(echo "$OBJECT_IDS" | wc -w)
+COUNT=0
+
 # For each object
 for OBJECT_ID in $OBJECT_IDS; do
+    COUNT=$((COUNT + 1))
     echo "   Processing object : $OBJECT_ID"
 
     echo "  Identification of triangles"
-    python -m segmentation.segment -s "$PROJET_PATH" -m "$MODEL_PATH" --eval --path_mask "$MASKS_DIR" --object_id "$OBJECT_ID"
+    python -m segmentation.segment -s "$PROJECT_PATH" -m "$MODEL_PATH" --eval --path_mask "$MASKS_DIR" --object_id "$OBJECT_ID"
     
     echo "   Filtering and rendering"
-    python -m segmentation.run_single_object -s "$PROJET_PATH" -m "$MODEL_PATH" --eval --ratio_threshold 0.90
+    if [ "$COUNT" -eq "$TOTAL_IDS" ]; then
+        python -m segmentation.run_single_object -s "$PROJECT_PATH" -m "$MODEL_PATH" --eval --ratio_threshold 0.60
+    else
+        python -m segmentation.run_single_object -s "$PROJECT_PATH" -m "$MODEL_PATH" --eval --ratio_threshold 0.90
+    fi
     
     echo "   Creation PLY file"
     python -m segmentation.create_ply "$MODEL_PATH" --out "$MODEL_PATH/mesh.ply"
 
     if [ -f "$MODEL_PATH/mesh.ply" ]; then
-        mv "$MODEL_PATH/mesh.ply" "$MODEL_PATH/${NOM_SCENE}_object_${OBJECT_ID}.ply"
-        echo "     Save object : ${NOM_SCENE}_object_${OBJECT_ID}.ply"
+        mv "$MODEL_PATH/mesh.ply" "$MODEL_PATH/${NAME_SCENE}_object_${OBJECT_ID}.ply"
+        echo "     Save object : ${NAME_SCENE}_object_${OBJECT_ID}.ply"
     else
         echo "    Error: The PLY file was not generated in $MODEL_PATH."
         exit 1
@@ -122,4 +146,4 @@ for OBJECT_ID in $OBJECT_IDS; do
 
 done
 
-echo "END OF $NOM_SCENE"
+echo "END OF $NAME_SCENE"
