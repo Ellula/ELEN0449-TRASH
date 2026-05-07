@@ -1,14 +1,14 @@
 #!/bin/bash
-#SBATCH --job-name=creatte_ply
+#SBATCH --job-name=create_ply
 #SBATCH --time=0-5:00:00
 #SBATCH --ntasks=1
 #SBATCH --mem=64G
 #SBATCH --gres=gpu:1
-#SBATCH --array=0-18%5
+#SBATCH --array=0-17%5
 #SBATCH --output=resultats/resultats_%A_%a.txt # %A = Global job ID, %a = Task ID
 #SBATCH --error=resultats/logs_%A_%a.txt
-#SBATCH --mail-user=mae.klinkenberg@student.uliege.be
-#SBATCH --mail-type=END,FAIL 
+
+# Script 3
 
 # Debugging
 echo "Start of the script - Task ID: $SLURM_ARRAY_TASK_ID"
@@ -54,7 +54,4 @@ fi
 echo "Start of create ply"
 python mesh-splatting/create_ply.py "$ITERATION_DIR" --out "$OUTPUT_DIR/$NOM_SCENE/${NOM_SCENE}_mesh.ply"
 
-
-
 echo "CLONE $SLURM_ARRAY_TASK_ID : END OF CREATE PLY"
-

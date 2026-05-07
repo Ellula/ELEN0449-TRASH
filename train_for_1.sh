@@ -1,18 +1,15 @@
 #!/bin/bash
-#SBATCH --job-name=mesh_splatting_array
+#SBATCH --job-name=mesh_splatting_S8_V2
 #SBATCH --time=2-00:00:00
 #SBATCH --ntasks=1
 #SBATCH --mem=64G
 #SBATCH --gres=gpu:1
-#SBATCH --array=0-18%5 # Launches 19 jobs (from 0 to 18), with a maximum of 5 concurrently
-#SBATCH --output=resultats/resultats_%A_%a.txt # %A = Global job ID, %a = Task ID
-#SBATCH --error=resultats/logs_%A_%a.txt
+#SBATCH --output=resultats/resultats_%j.txt # %j = Job ID classique
+#SBATCH --error=resultats/logs_%j.txt
 #SBATCH --nodelist=compute-07
 
-# Script 2
-
 # Debugging
-echo "Start of the script - Task ID: $SLURM_ARRAY_TASK_ID"
+echo "Start of the script - Single Job"
 
 # Environment activation
 eval "$(/home/mklinkenberg/.local/bin/micromamba shell hook --shell bash)"
@@ -24,22 +21,20 @@ DATA_DIR="$(pwd)/data"
 OUTPUT_DIR="$(pwd)/output"
 mkdir -p "$OUTPUT_DIR"
 
-# Create a list of all "project-*" folders
-DOSSIERS=("$DATA_DIR"/project-*)
+# Définir explicitement le dossier du projet
+# /!\ Modifie "project-S8_V2" par "S8_V2" si ton dossier n'a pas le préfixe "project-"
+PROJET_PATH="$DATA_DIR/project-S8_V2"
 
-# Select the folder corresponding to this clone's number
-PROJET_PATH="${DOSSIERS[$SLURM_ARRAY_TASK_ID]}"
-
-# Safety check in case the ID exceeds the number of folders
-if [ -z "$PROJET_PATH" ] || [ ! -d "$PROJET_PATH" ]; then
-    echo "End: No folder found for task n°$SLURM_ARRAY_TASK_ID"
-    exit 0
+# Safety check
+if [ ! -d "$PROJET_PATH" ]; then
+    echo "Erreur : Le dossier $PROJET_PATH n'existe pas."
+    exit 1
 fi
 
 NOM_SCENE=$(basename "$PROJET_PATH")
 
 echo "-------------------------------------------------------"
-echo "CLONE $SLURM_ARRAY_TASK_ID : START OF PROCESSING FOR $NOM_SCENE"
+echo "START OF PROCESSING FOR $NOM_SCENE"
 echo "-------------------------------------------------------"
 
 export PYTHONUNBUFFERED=1
@@ -93,7 +88,6 @@ for IMG_DIR in "$PROJET_PATH"/images*; do
 done
 
 rm -rf "$OUTPUT_DIR/$NOM_SCENE"
-
 rm -rf "$PROJET_PATH/normals"*
 
 # Training
@@ -104,4 +98,4 @@ echo "Start of training"
 mkdir -p "$OUTPUT_DIR/$NOM_SCENE"
 python mesh-splatting/train.py -s "$PROJET_PATH" -m "$OUTPUT_DIR/$NOM_SCENE" --indoor --eval -r 2
 
-echo "CLONE $SLURM_ARRAY_TASK_ID : END OF PROCESSING"
+echo "END OF PROCESSING FOR $NOM_SCENE"

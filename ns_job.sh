@@ -6,6 +6,7 @@
 #SBATCH --gres=gpu:1
 #SBATCH --output=resultats/resultats_%j.txt
 
+# Script 1
 
 # Environment Initialization
 echo "Initializing environment..."
