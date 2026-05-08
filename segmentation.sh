@@ -32,12 +32,7 @@ PT_LARGE_MODEL_PATH="/home/mklinkenberg/cvu/sam2/sam2.1_hiera_large.pt"
 PT_BASE_MODEL_PATH="/home/mklinkenberg/cvu/sam2/sam2.1_hiera_base_plus.pt"
 
 # We select the right project folder
-shopt -s nullglob
-FOLDERS=(
-    "$DATA_DIR/project-S3_V2"
-    "$DATA_DIR"/project-S[6-9]_*
-)
-shopt -u nullglob
+FOLDERS=("$DATA_DIR"/project-*)
 PROJECT_PATH="${FOLDERS[$SLURM_ARRAY_TASK_ID]}"
 
 # Security
