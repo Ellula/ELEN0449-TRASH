@@ -9,7 +9,7 @@
 # Script 1
 
 # Environment Initialization
-echo "Initializing environment..."
+echo "Initializing environment"
 source ~/anaconda3/etc/profile.d/conda.sh
 conda activate cvu-mesh
 

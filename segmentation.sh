@@ -2,14 +2,12 @@
 #SBATCH --job-name=mesh_segmentation_array
 #SBATCH --time=0-04:00:00
 #SBATCH --ntasks=1
-#SBATCH --mem=364
+#SBATCH --mem=64G
 #SBATCH --gres=gpu:1
 #SBATCH --array=0-17%5
 #SBATCH --output=resultats/resultats_seg_%A_%a.txt
 #SBATCH --error=resultats/logs_seg_%A_%a.txt
 #SBATCH --nodelist=compute-11
-#SBATCH --mail-user=mae.klinkenberg@student.uliege.be
-#SBATCH --mail-type=END,FAIL
 
 # Script 6
 
@@ -36,9 +34,8 @@ PT_BASE_MODEL_PATH="/home/mklinkenberg/cvu/sam2/sam2.1_hiera_base_plus.pt"
 # We select the right project folder
 shopt -s nullglob
 FOLDERS=(
-    "$DATA_DIR"/project-S[1-2]_*
-    "$DATA_DIR/project-S3_V1"
-    "$DATA_DIR"/project-S[4-5]_*
+    "$DATA_DIR/project-S3_V2"
+    "$DATA_DIR"/project-S[6-9]_*
 )
 shopt -u nullglob
 PROJECT_PATH="${FOLDERS[$SLURM_ARRAY_TASK_ID]}"
@@ -136,10 +133,11 @@ for OBJECT_ID in $OBJECT_IDS; do
     python -m segmentation.segment -s "$PROJECT_PATH" -m "$MODEL_PATH" --eval --path_mask "$MASKS_DIR" --object_id "$OBJECT_ID"
     
     echo "   Filtering and rendering"
+    # If it's the last object, then it is the reference object and we lower the threshold
     if [ "$COUNT" -eq "$TOTAL_IDS" ]; then
         python -m segmentation.run_single_object -s "$PROJECT_PATH" -m "$MODEL_PATH" --eval --ratio_threshold 0.60
     elif [ "$MANY_WASTES" == "TRUE" ]; then
-        python -m segmentation.run_single_object -s "$PROJECT_PATH" -m "$MODEL_PATH" --eval --ratio_threshold 0.70 --min_hits 5
+        python -m segmentation.run_single_object -s "$PROJECT_PATH" -m "$MODEL_PATH" --eval --ratio_threshold 0.70
     else
         python -m segmentation.run_single_object -s "$PROJECT_PATH" -m "$MODEL_PATH" --eval --ratio_threshold 0.90
     fi
